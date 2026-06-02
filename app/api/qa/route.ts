@@ -1,5 +1,4 @@
-//New update on the second line
-export const maxDuration = 30; // Applies the 30-second timeout
+
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
