@@ -1,9 +1,9 @@
 {
   "functions": {
-    "app/api/extract/route.ts": {
+    "api/extract/route.ts": {
       "maxDuration": 60
     },
-    "app/api/qa/route.ts": {
+    "api/qa/route.ts": {
       "maxDuration": 30
     }
   }
