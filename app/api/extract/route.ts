@@ -1,3 +1,6 @@
+//new update 2nd line
+export const maxDuration = 60; // Applies the 60-second timeout
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { extractYouTubeTranscript } from '@/lib/extractors/youtube'
