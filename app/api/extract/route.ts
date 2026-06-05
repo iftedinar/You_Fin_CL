@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { extractYouTubeTranscript } from '@/lib/extractors/youtube'
@@ -77,21 +76,20 @@ export async function POST(req: NextRequest) {
 
     if (insertError) throw insertError
 
-    // Run AI extraction (async — don't await in response, do it then update)
-    // We respond immediately then process in background
-    extractKnowledge(rawText)
-      .then(async (extracted) => {
-        await supabase
-          .from('resources')
-          .update({ extracted, title: extracted.title || title, status: 'ready' })
-          .eq('id', resource.id)
-      })
-      .catch(async (err) => {
-        await supabase
-          .from('resources')
-          .update({ status: 'error', error_message: err.message })
-          .eq('id', resource.id)
-      })
+    // Run AI extraction — awaited so it completes before the serverless function exits
+    try {
+      const extracted = await extractKnowledge(rawText)
+      await supabase
+        .from('resources')
+        .update({ extracted, title: extracted.title || title, status: 'ready' })
+        .eq('id', resource.id)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Extraction failed'
+      await supabase
+        .from('resources')
+        .update({ status: 'error', error_message: message })
+        .eq('id', resource.id)
+    }
 
     return NextResponse.json({ id: resource.id, title })
 
