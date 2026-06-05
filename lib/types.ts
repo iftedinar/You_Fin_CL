@@ -1,4 +1,4 @@
-export type SourceType = 'youtube' | 'article' | 'pdf' | 'note'
+export type SourceType = 'youtube' | 'article' | 'pdf' | 'docx' | 'txt' | 'note'
 
 export type ResourceStatus = 'processing' | 'ready' | 'error'
 

@@ -8,7 +8,7 @@ create table if not exists public.resources (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references auth.users(id) on delete cascade,
   title           text not null default 'Untitled',
-  source_type     text not null check (source_type in ('youtube', 'article', 'pdf', 'note')),
+  source_type     text not null check (source_type in ('youtube', 'article', 'pdf', 'docx', 'txt', 'note')),
   source_url      text,
   raw_text        text,
   extracted       jsonb,

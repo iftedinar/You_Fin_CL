@@ -15,7 +15,18 @@ const SOURCE_ICONS: Record<string, React.ElementType> = {
   youtube: Youtube,
   article: Globe,
   pdf: FileText,
+  docx: FileText,
+  txt: FileText,
   note: StickyNote,
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  youtube: 'YouTube',
+  article: 'Article',
+  pdf: 'PDF',
+  docx: 'Word',
+  txt: 'Text',
+  note: 'Note',
 }
 
 const STUDY_STATUS_ICONS: Record<string, React.ElementType> = {
@@ -25,7 +36,7 @@ const STUDY_STATUS_ICONS: Record<string, React.ElementType> = {
   saved_for_later: Bookmark,
 }
 
-const FILTERS = ['all', 'youtube', 'article', 'pdf', 'note'] as const
+const FILTERS = ['all', 'youtube', 'article', 'pdf', 'docx', 'txt', 'note'] as const
 
 export default function LibraryPage() {
   const [resources, setResources] = useState<Resource[]>([])
@@ -45,13 +56,8 @@ export default function LibraryPage() {
 
   useEffect(() => {
     fetchResources()
-
-    // Listen for new resources added via modal
     window.addEventListener('resource-added', fetchResources)
-
-    // Poll for status updates on processing items
     const interval = setInterval(fetchResources, 8000)
-
     return () => {
       window.removeEventListener('resource-added', fetchResources)
       clearInterval(interval)
@@ -60,17 +66,18 @@ export default function LibraryPage() {
 
   const filtered = resources.filter(r => {
     const matchesFilter = filter === 'all' || r.source_type === filter
-    const matchesSearch = !search || 
+    const matchesSearch = !search ||
       r.title.toLowerCase().includes(search.toLowerCase()) ||
       (r.extracted?.topic_tags ?? []).some(t => t.toLowerCase().includes(search.toLowerCase()))
     return matchesFilter && matchesSearch
   })
 
+  // Only show filter tabs that have content
+  const activeFilters = FILTERS.filter(f => f === 'all' || resources.some(r => r.source_type === f))
   const processing = resources.filter(r => r.status === 'processing').length
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-gray-900">Library</h1>
@@ -86,7 +93,6 @@ export default function LibraryPage() {
         )}
       </div>
 
-      {/* Search + filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -98,7 +104,7 @@ export default function LibraryPage() {
           />
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {FILTERS.map(f => (
+          {activeFilters.map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -109,13 +115,12 @@ export default function LibraryPage() {
                   : 'bg-white text-gray-600 border border-surface-border hover:bg-surface-tertiary'
               )}
             >
-              {f}
+              {f === 'all' ? 'All' : SOURCE_LABELS[f] ?? f}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Resource grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -144,6 +149,7 @@ export default function LibraryPage() {
 function ResourceCard({ resource, onRefresh }: { resource: Resource; onRefresh: () => void }) {
   const SourceIcon = SOURCE_ICONS[resource.source_type] ?? FileText
   const StatusIcon = STUDY_STATUS_ICONS[resource.study_status] ?? Clock
+  const sourceLabel = SOURCE_LABELS[resource.source_type] ?? resource.source_type
 
   const isProcessing = resource.status === 'processing'
   const isError = resource.status === 'error'
@@ -153,13 +159,12 @@ function ResourceCard({ resource, onRefresh }: { resource: Resource; onRefresh: 
       'card flex flex-col gap-3 hover:shadow-card-hover transition-shadow',
       isProcessing && 'opacity-75'
     )}>
-      {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0">
             <SourceIcon className="w-3.5 h-3.5 text-gray-500" />
           </div>
-          <span className="text-xs text-gray-400 capitalize">{resource.source_type}</span>
+          <span className="text-xs text-gray-400">{sourceLabel}</span>
         </div>
 
         {isProcessing ? (
@@ -179,7 +184,6 @@ function ResourceCard({ resource, onRefresh }: { resource: Resource; onRefresh: 
         )}
       </div>
 
-      {/* Title */}
       <div className="flex-1">
         <h3 className="text-sm font-semibold text-gray-900 leading-snug">
           {truncate(resource.title, 60)}
@@ -194,7 +198,6 @@ function ResourceCard({ resource, onRefresh }: { resource: Resource; onRefresh: 
         )}
       </div>
 
-      {/* Tags */}
       {(resource.extracted?.topic_tags ?? []).length > 0 && (
         <div className="flex flex-wrap gap-1">
           {resource.extracted!.topic_tags.slice(0, 3).map(tag => (
@@ -205,7 +208,6 @@ function ResourceCard({ resource, onRefresh }: { resource: Resource; onRefresh: 
         </div>
       )}
 
-      {/* Footer */}
       <div className="flex items-center justify-between pt-1 border-t border-surface-border">
         <div className="flex items-center gap-1 text-xs text-gray-400">
           <StatusIcon className="w-3 h-3" />
@@ -214,12 +216,8 @@ function ResourceCard({ resource, onRefresh }: { resource: Resource; onRefresh: 
         <span className="text-xs text-gray-400">{formatDate(resource.created_at)}</span>
       </div>
 
-      {/* Action */}
       {!isProcessing && !isError && (
-        <Link
-          href={`/resource/${resource.id}`}
-          className="btn-primary text-xs py-1.5 justify-center"
-        >
+        <Link href={`/resource/${resource.id}`} className="btn-primary text-xs py-1.5 justify-center">
           Open resource
         </Link>
       )}

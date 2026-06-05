@@ -3,9 +3,19 @@ import { createClient } from '@/lib/supabase/server'
 import { extractYouTubeTranscript } from '@/lib/extractors/youtube'
 import { extractArticle } from '@/lib/extractors/article'
 import { extractPDF } from '@/lib/extractors/pdf'
+import { extractDOCX } from '@/lib/extractors/docx'
+import { extractTXT } from '@/lib/extractors/txt'
 import { extractKnowledge } from '@/lib/claude'
 
 export const maxDuration = 60
+
+function detectUrlType(url: string): 'youtube' | 'article' {
+  try {
+    const { hostname } = new URL(url)
+    if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) return 'youtube'
+  } catch {}
+  return 'article'
+}
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -20,7 +30,7 @@ export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get('content-type') ?? ''
 
-    // ── PDF upload ──
+    // ── File upload ──
     if (contentType.includes('multipart/form-data')) {
       const form = await req.formData()
       const file = form.get('file') as File | null
@@ -28,15 +38,48 @@ export async function POST(req: NextRequest) {
       if (file.size > 20 * 1024 * 1024) return NextResponse.json({ error: 'File too large (max 20 MB)' }, { status: 400 })
 
       const buffer = Buffer.from(await file.arrayBuffer())
-      const result = await extractPDF(buffer)
-      rawText = result.text
-      title = result.title
-      sourceType = 'pdf'
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+
+      if (ext === 'pdf') {
+        const result = await extractPDF(buffer)
+        rawText = result.text
+        title = result.title
+        sourceType = 'pdf'
+      } else if (ext === 'docx') {
+        const result = await extractDOCX(buffer)
+        rawText = result.text
+        title = result.title
+        sourceType = 'docx'
+      } else if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
+        const result = await extractTXT(buffer, file.name)
+        rawText = result.text
+        title = result.title
+        sourceType = 'txt'
+      } else {
+        return NextResponse.json({ error: 'Unsupported file type. Please upload PDF, DOCX, TXT, or MD files.' }, { status: 400 })
+      }
 
     } else {
       const body = await req.json()
 
-      if (body.type === 'youtube') {
+      if (body.type === 'url') {
+        // Auto-detect YouTube vs article
+        sourceUrl = body.url
+        const urlType = detectUrlType(body.url)
+        if (urlType === 'youtube') {
+          const result = await extractYouTubeTranscript(body.url)
+          rawText = result.text
+          title = result.title
+          sourceType = 'youtube'
+        } else {
+          const result = await extractArticle(body.url)
+          rawText = result.text
+          title = result.title
+          sourceType = 'article'
+        }
+
+      } else if (body.type === 'youtube') {
+        // Keep backward compatibility
         sourceUrl = body.url
         const result = await extractYouTubeTranscript(body.url)
         rawText = result.text
@@ -44,6 +87,7 @@ export async function POST(req: NextRequest) {
         sourceType = 'youtube'
 
       } else if (body.type === 'article') {
+        // Keep backward compatibility
         sourceUrl = body.url
         const result = await extractArticle(body.url)
         rawText = result.text

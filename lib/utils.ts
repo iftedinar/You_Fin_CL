@@ -23,6 +23,8 @@ export function sourceTypeLabel(type: string): string {
     youtube: 'YouTube',
     article: 'Article',
     pdf: 'PDF',
+    docx: 'Word Doc',
+    txt: 'Text File',
     note: 'Note',
   }
   return labels[type] ?? type
