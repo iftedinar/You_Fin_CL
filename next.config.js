@@ -6,13 +6,6 @@ const nextConfig = {
       { protocol: 'https', hostname: '**' },
     ],
   },
-  // Add the Webpack fallback block below to fix the PostCSS/CSS optimization failure
-  webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      config.optimization.minimize = true;
-    }
-    return config;
-  },
 }
 
 module.exports = nextConfig
