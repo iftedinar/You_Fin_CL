@@ -36,7 +36,7 @@ const STUDY_STATUS_ICONS: Record<string, React.ElementType> = {
   saved_for_later: Bookmark,
 }
 
-const FILTERS = ['all', 'youtube', 'article', 'pdf', 'docx', 'txt', 'note'] as const
+const FILTERS = [ 'all' , 'youtube' , 'article' , 'pdf' , 'docx' , 'txt' , 'note' ] as const
 
 export default function LibraryPage() {
   const [resources, setResources] = useState<Resource[]>([])
