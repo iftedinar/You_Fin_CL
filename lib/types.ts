@@ -54,6 +54,7 @@ export interface Resource {
   extracted: ExtractedKnowledge | null
   status: ResourceStatus
   study_status: StudyStatus
+  error_message?: string | null
   created_at: string
   updated_at: string
 }
