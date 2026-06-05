@@ -1,13 +1,9 @@
+// app/page.tsx
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 
 export default async function RootPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (user) {
-    redirect('/library')
-  }
-
-  redirect('/auth/login')
+  // Your middleware already intercepts requests and forces authenticated users to /library 
+  // and unauthenticated users to /auth/login.
+  // This default redirect is a clean fallback to kickstart that middleware logic.
+  redirect('/library')
 }
