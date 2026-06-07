@@ -76,3 +76,14 @@ export interface QuizAttempt {
   answers: number[]
   created_at: string
 }
+
+export interface TestAttempt {
+  id: string
+  user_id: string
+  resource_ids: string[]
+  score: number
+  total: number
+  answers: (number | null)[]
+  questions: QuizQuestion[]
+  created_at: string
+}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { BookOpen, Library, LayoutDashboard, LogOut, Plus } from 'lucide-react'
+import { BookOpen, Library, LayoutDashboard, LogOut, Plus, Sparkles, ListChecks } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -10,6 +10,8 @@ import AddResourceModal from '@/components/ui/AddResourceModal'
 
 const navItems = [
   { href: '/library', label: 'Library', icon: Library },
+  { href: '/assistant', label: 'AI Assistant', icon: Sparkles },
+  { href: '/test', label: 'Test', icon: ListChecks },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
 ]
 
