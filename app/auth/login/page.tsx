@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { BookOpen, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react'
+import { BookOpen, Mail, Lock, ArrowRight, Loader2, UserRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [guestLoading, setGuestLoading] = useState(false)
   const supabase = createClient()
 
   async function handleLogin(e: React.FormEvent) {
@@ -19,6 +20,21 @@ export default function LoginPage() {
     if (error) {
       toast.error(error.message)
       setLoading(false)
+    } else {
+      window.location.href = '/library'
+    }
+  }
+
+  async function handleGuest() {
+    setGuestLoading(true)
+    const { error } = await supabase.auth.signInAnonymously()
+    if (error) {
+      toast.error(
+        error.message.toLowerCase().includes('disabled')
+          ? 'Guest access is not enabled yet. Please sign up instead.'
+          : error.message
+      )
+      setGuestLoading(false)
     } else {
       window.location.href = '/library'
     }
@@ -70,11 +86,30 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
+            <button type="submit" className="btn-primary w-full justify-center" disabled={loading || guestLoading}>
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-surface-border" />
+            <span className="text-xs text-gray-400">or</span>
+            <div className="flex-1 h-px bg-surface-border" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGuest}
+            className="btn-secondary w-full justify-center"
+            disabled={loading || guestLoading}
+          >
+            {guestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserRound className="w-4 h-4" />}
+            {guestLoading ? 'Setting up guest space…' : 'Continue as guest'}
+          </button>
+          <p className="text-center text-xs text-gray-400 mt-2">
+            No signup needed — you can create an account later to keep your data
+          </p>
 
           <p className="text-center text-sm text-gray-500 mt-4">
             No account?{' '}

@@ -37,12 +37,14 @@ const STUDY_STATUS_ICONS: Record<string, React.ElementType> = {
 }
 
 const FILTERS = [ 'all' , 'youtube' , 'article' , 'pdf' , 'docx' , 'txt' , 'note' ] as const
+const DIFFICULTIES = [ 'all', 'beginner', 'intermediate', 'advanced' ] as const
 
 export default function LibraryPage() {
   const [resources, setResources] = useState<Resource[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<typeof FILTERS[number]>('all')
+  const [difficulty, setDifficulty] = useState<typeof DIFFICULTIES[number]>('all')
   const supabase = createClient()
 
   const fetchResources = useCallback(async () => {
@@ -66,10 +68,18 @@ export default function LibraryPage() {
 
   const filtered = resources.filter(r => {
     const matchesFilter = filter === 'all' || r.source_type === filter
-    const matchesSearch = !search ||
-      r.title.toLowerCase().includes(search.toLowerCase()) ||
-      (r.extracted?.topic_tags ?? []).some(t => t.toLowerCase().includes(search.toLowerCase()))
-    return matchesFilter && matchesSearch
+    const matchesDifficulty = difficulty === 'all' || r.extracted?.difficulty === difficulty
+    const q = search.toLowerCase()
+    // Full-text-ish search: title, tags, concepts, strategies, summary
+    const matchesSearch = !q ||
+      r.title.toLowerCase().includes(q) ||
+      (r.extracted?.topic_tags ?? []).some(t => t.toLowerCase().includes(q)) ||
+      (r.extracted?.key_concepts ?? []).some(c =>
+        c.term.toLowerCase().includes(q) || c.definition.toLowerCase().includes(q)
+      ) ||
+      (r.extracted?.strategies ?? []).some(s => s.name.toLowerCase().includes(q)) ||
+      (r.extracted?.summary_short ?? '').toLowerCase().includes(q)
+    return matchesFilter && matchesDifficulty && matchesSearch
   })
 
   // Only show filter tabs that have content
@@ -98,7 +108,7 @@ export default function LibraryPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             className="input pl-9"
-            placeholder="Search by title or topic…"
+            placeholder="Search titles, topics, concepts, strategies…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -118,6 +128,15 @@ export default function LibraryPage() {
               {f === 'all' ? 'All' : SOURCE_LABELS[f] ?? f}
             </button>
           ))}
+          <select
+            value={difficulty}
+            onChange={e => setDifficulty(e.target.value as typeof DIFFICULTIES[number])}
+            className="px-2 py-1.5 text-sm font-medium rounded-lg bg-white text-gray-600 border border-surface-border capitalize focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+          >
+            {DIFFICULTIES.map(d => (
+              <option key={d} value={d}>{d === 'all' ? 'Any level' : d}</option>
+            ))}
+          </select>
         </div>
       </div>
 

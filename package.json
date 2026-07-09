@@ -23,7 +23,8 @@
     "react-hot-toast": "^2.5.2",
     "recharts": "^2.15.3",
     "tailwind-merge": "^3.3.0",
-    "youtube-transcript": "^1.2.1"
+    "youtube-transcript": "^1.2.1",
+    "youtubei.js": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",

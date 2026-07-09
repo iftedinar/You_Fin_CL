@@ -39,7 +39,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth pages
-  if (user && isAuthPage && !request.nextUrl.pathname.startsWith('/auth/callback')) {
+  // (except callback, and except /auth/upgrade which guests use to convert to a full account)
+  if (
+    user &&
+    isAuthPage &&
+    !request.nextUrl.pathname.startsWith('/auth/callback') &&
+    !request.nextUrl.pathname.startsWith('/auth/upgrade')
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/library'
     return NextResponse.redirect(url)

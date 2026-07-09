@@ -5,9 +5,11 @@ import { extractArticle } from '@/lib/extractors/article'
 import { extractPDF } from '@/lib/extractors/pdf'
 import { extractDOCX } from '@/lib/extractors/docx'
 import { extractTXT } from '@/lib/extractors/txt'
-import { extractKnowledge } from '@/lib/claude'
+import { extractKnowledge, type SourceMeta } from '@/lib/claude'
 
-export const maxDuration = 60
+// Long videos use chunked extraction and can exceed 60s.
+// On Vercel Hobby with Fluid Compute this allows up to 300s.
+export const maxDuration = 300
 
 function detectUrlType(url: string): 'youtube' | 'article' {
   try {
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
   let title = 'Untitled'
   let sourceType = ''
   let sourceUrl: string | null = null
+  const meta: SourceMeta = {}
 
   try {
     const contentType = req.headers.get('content-type') ?? ''
@@ -61,40 +64,26 @@ export async function POST(req: NextRequest) {
 
     } else {
       const body = await req.json()
+      const type = body.type === 'url' ? detectUrlType(body.url) : body.type
 
-      if (body.type === 'url') {
-        // Auto-detect YouTube vs article
-        sourceUrl = body.url
-        const urlType = detectUrlType(body.url)
-        if (urlType === 'youtube') {
-          const result = await extractYouTubeTranscript(body.url)
-          rawText = result.text
-          title = result.title
-          sourceType = 'youtube'
-        } else {
-          const result = await extractArticle(body.url)
-          rawText = result.text
-          title = result.title
-          sourceType = 'article'
-        }
-
-      } else if (body.type === 'youtube') {
-        // Keep backward compatibility
+      if (type === 'youtube') {
         sourceUrl = body.url
         const result = await extractYouTubeTranscript(body.url)
         rawText = result.text
         title = result.title
         sourceType = 'youtube'
+        meta.author = result.author
+        meta.durationSeconds = result.durationSeconds
 
-      } else if (body.type === 'article') {
-        // Keep backward compatibility
+      } else if (type === 'article') {
         sourceUrl = body.url
         const result = await extractArticle(body.url)
         rawText = result.text
         title = result.title
         sourceType = 'article'
+        meta.author = result.author
 
-      } else if (body.type === 'note') {
+      } else if (type === 'note') {
         rawText = body.text
         title = body.title || 'Personal note'
         sourceType = 'note'
@@ -103,6 +92,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid source type' }, { status: 400 })
       }
     }
+
+    meta.sourceType = sourceType
+    meta.title = title
 
     // Insert resource as 'processing'
     const { data: resource, error: insertError } = await supabase
@@ -122,11 +114,26 @@ export async function POST(req: NextRequest) {
 
     // Run AI extraction — awaited so it completes before the serverless function exits
     try {
-      const extracted = await extractKnowledge(rawText)
+      const extracted = await extractKnowledge(rawText, meta)
       await supabase
         .from('resources')
         .update({ extracted, title: extracted.title || title, status: 'ready' })
         .eq('id', resource.id)
+
+      // Seed spaced-repetition flashcards (best-effort — table may not exist yet)
+      if (extracted.flashcards.length > 0) {
+        const { error: fcError } = await supabase.from('flashcards').insert(
+          extracted.flashcards
+            .filter(f => f.front && f.back)
+            .map(f => ({
+              user_id: user.id,
+              resource_id: resource.id,
+              front: f.front,
+              back: f.back,
+            }))
+        )
+        if (fcError) console.error('Flashcard insert failed (run the flashcards migration?):', fcError.message)
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Extraction failed'
       await supabase

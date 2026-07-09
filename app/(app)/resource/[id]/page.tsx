@@ -6,10 +6,13 @@ import Link from 'next/link'
 import {
   ArrowLeft, BookOpen, Lightbulb, HelpCircle, MessageSquare,
   StickyNote, Loader2, CheckCircle, XCircle, ChevronRight,
-  ExternalLink, Trash2, Tag
+  ExternalLink, Trash2, Tag, Download, PlayCircle, Compass,
+  BarChart3, BookMarked, Library as LibraryIcon
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, difficultyColor, studyStatusLabel } from '@/lib/utils'
+import { downloadMarkdown } from '@/lib/export-md'
+import { extractYouTubeId, formatTimestamp } from '@/lib/extractors/youtube'
 import type { Resource, Note, QuizQuestion, QuizAttempt } from '@/lib/types'
 import toast from 'react-hot-toast'
 
@@ -130,6 +133,15 @@ export default function ResourcePage({ params }: { params: Promise<{ id: string 
               <option value="completed">Completed</option>
               <option value="saved_for_later">Saved for later</option>
             </select>
+            {resource.extracted && (
+              <button
+                onClick={() => downloadMarkdown(resource)}
+                title="Export notes as Markdown (Obsidian/Notion-ready)"
+                className="btn-ghost p-2 text-gray-400 hover:text-brand-600"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            )}
             <button onClick={handleDelete} className="btn-ghost p-2 text-red-400 hover:text-red-600">
               <Trash2 className="w-4 h-4" />
             </button>
@@ -153,7 +165,7 @@ export default function ResourcePage({ params }: { params: Promise<{ id: string 
           <Loader2 className="w-5 h-5 animate-spin text-amber-500 shrink-0" />
           <div>
             <p className="text-sm font-medium text-amber-800">Extracting knowledge…</p>
-            <p className="text-xs text-amber-600">This takes 15–30 seconds. The page will update automatically.</p>
+            <p className="text-xs text-amber-600">Short content takes ~30 seconds; long videos can take a few minutes. The page updates automatically.</p>
           </div>
         </div>
       )}
@@ -193,12 +205,79 @@ export default function ResourcePage({ params }: { params: Promise<{ id: string 
 // ── Summary Tab ──────────────────────────────────────────────
 function SummaryTab({ resource }: { resource: Resource }) {
   const ex = resource.extracted!
+  const videoId = resource.source_type === 'youtube' && resource.source_url
+    ? extractYouTubeId(resource.source_url)
+    : null
+  const [playAt, setPlayAt] = useState<number | null>(null)
+  const chapters = ex.chapters ?? []
+  const dataPoints = ex.key_data_points ?? []
+  const mentioned = ex.mentioned_resources ?? []
+  const goDeeper = ex.go_deeper ?? []
+
   return (
     <div className="space-y-5">
+      {/* Embedded video player — reloads at the clicked timestamp */}
+      {videoId && playAt !== null && (
+        <div className="card p-0 overflow-hidden">
+          <div className="aspect-video">
+            <iframe
+              key={playAt}
+              className="w-full h-full"
+              src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(playAt)}&autoplay=1`}
+              title={resource.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <p className="section-label mb-3">Quick summary</p>
         <p className="text-gray-700 leading-relaxed">{ex.summary_short}</p>
+        {videoId && playAt === null && (
+          <button onClick={() => setPlayAt(0)} className="btn-secondary text-xs mt-3">
+            <PlayCircle className="w-3.5 h-3.5" /> Watch video here
+          </button>
+        )}
       </div>
+
+      {/* Chapter-by-chapter breakdown with clickable timestamps */}
+      {chapters.length > 0 && (
+        <div className="card">
+          <p className="section-label mb-3">Chapter breakdown</p>
+          <div className="space-y-4">
+            {chapters.map((ch, i) => (
+              <div key={i} className="p-3 bg-surface-secondary rounded-lg">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {ch.start_seconds != null && videoId ? (
+                    <button
+                      onClick={() => setPlayAt(ch.start_seconds)}
+                      className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded transition-colors"
+                    >
+                      <PlayCircle className="w-3 h-3" /> {formatTimestamp(ch.start_seconds)}
+                    </button>
+                  ) : ch.start_seconds != null ? (
+                    <span className="text-xs font-mono text-gray-400">[{formatTimestamp(ch.start_seconds)}]</span>
+                  ) : null}
+                  <p className="text-sm font-semibold text-gray-900">{ch.title}</p>
+                </div>
+                <p className="text-sm text-gray-600 mt-1.5">{ch.summary}</p>
+                {(ch.key_points ?? []).length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {ch.key_points.map((p, pi) => (
+                      <li key={pi} className="flex items-start gap-2 text-xs text-gray-600">
+                        <ChevronRight className="w-3 h-3 text-brand-400 mt-0.5 shrink-0" />
+                        {p}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <p className="section-label mb-3">Detailed summary</p>
@@ -209,7 +288,7 @@ function SummaryTab({ resource }: { resource: Resource }) {
         </div>
       </div>
 
-      {ex.key_takeaways.length > 0 && (
+      {(ex.key_takeaways ?? []).length > 0 && (
         <div className="card">
           <p className="section-label mb-3">Key takeaways</p>
           <ul className="space-y-2">
@@ -223,7 +302,7 @@ function SummaryTab({ resource }: { resource: Resource }) {
         </div>
       )}
 
-      {ex.strategies.length > 0 && (
+      {(ex.strategies ?? []).length > 0 && (
         <div className="card">
           <p className="section-label mb-3">Strategies & methods</p>
           <div className="space-y-4">
@@ -247,7 +326,7 @@ function SummaryTab({ resource }: { resource: Resource }) {
         </div>
       )}
 
-      {ex.formulas.length > 0 && (
+      {(ex.formulas ?? []).length > 0 && (
         <div className="card">
           <p className="section-label mb-3">Formulas</p>
           <div className="space-y-3">
@@ -261,6 +340,135 @@ function SummaryTab({ resource }: { resource: Resource }) {
           </div>
         </div>
       )}
+
+      {/* Specific numbers/stats cited in the source */}
+      {dataPoints.length > 0 && (
+        <div className="card">
+          <p className="section-label mb-3 flex items-center gap-1.5">
+            <BarChart3 className="w-3.5 h-3.5" /> Data points cited
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {dataPoints.map((d, i) => (
+              <div key={i} className="p-2.5 bg-surface-secondary rounded-lg">
+                <p className="text-sm font-semibold text-brand-700">{d.value}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{d.context}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Books, tools, tickers, people the source references */}
+      {mentioned.length > 0 && (
+        <div className="card">
+          <p className="section-label mb-3 flex items-center gap-1.5">
+            <BookMarked className="w-3.5 h-3.5" /> Mentioned in this resource
+          </p>
+          <div className="space-y-2">
+            {mentioned.map((m, i) => (
+              <div key={i} className="flex items-start gap-2.5 p-2.5 bg-surface-secondary rounded-lg">
+                <span className="badge bg-brand-50 text-brand-600 text-xs capitalize shrink-0 mt-0.5">{m.type}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{m.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{m.context}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI-suggested next topics */}
+      {goDeeper.length > 0 && (
+        <div className="card">
+          <p className="section-label mb-3 flex items-center gap-1.5">
+            <Compass className="w-3.5 h-3.5" /> Go deeper — what to learn next
+          </p>
+          <div className="space-y-3">
+            {goDeeper.map((g, i) => (
+              <div key={i} className="p-3 bg-surface-secondary rounded-lg">
+                <p className="text-sm font-semibold text-gray-900">{g.topic}</p>
+                <p className="text-xs text-gray-600 mt-1">{g.why}</p>
+                <div className="flex gap-2 mt-2">
+                  <a
+                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(g.suggested_search)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-brand-600 hover:underline inline-flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Find videos
+                  </a>
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(g.suggested_search)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-brand-600 hover:underline inline-flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Find articles
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <RelatedResources resource={resource} />
+    </div>
+  )
+}
+
+// ── Related resources (shared topic tags in your library) ───
+function RelatedResources({ resource }: { resource: Resource }) {
+  const [related, setRelated] = useState<Array<{ id: string; title: string; shared: string[] }>>([])
+  const supabase = createClient()
+  const tags = (resource.extracted?.topic_tags ?? []).map(t => t.toLowerCase())
+
+  useEffect(() => {
+    if (tags.length === 0) return
+    supabase
+      .from('resources')
+      .select('id, title, extracted')
+      .eq('status', 'ready')
+      .neq('id', resource.id)
+      .then(({ data }) => {
+        const scored = (data ?? [])
+          .map(r => {
+            const otherTags: string[] = (r.extracted?.topic_tags ?? []).map((t: string) => t.toLowerCase())
+            const shared = otherTags.filter(t => tags.includes(t))
+            return { id: r.id as string, title: r.title as string, shared }
+          })
+          .filter(r => r.shared.length > 0)
+          .sort((a, b) => b.shared.length - a.shared.length)
+          .slice(0, 4)
+        setRelated(scored)
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resource.id])
+
+  if (related.length === 0) return null
+
+  return (
+    <div className="card">
+      <p className="section-label mb-3 flex items-center gap-1.5">
+        <LibraryIcon className="w-3.5 h-3.5" /> Related in your library
+      </p>
+      <div className="space-y-2">
+        {related.map(r => (
+          <Link
+            key={r.id}
+            href={`/resource/${r.id}`}
+            className="flex items-center justify-between gap-3 p-2.5 bg-surface-secondary hover:bg-surface-tertiary rounded-lg transition-colors"
+          >
+            <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
+            <div className="flex gap-1 shrink-0">
+              {r.shared.slice(0, 2).map(t => (
+                <span key={t} className="badge bg-brand-50 text-brand-600 text-xs">{t}</span>
+              ))}
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }

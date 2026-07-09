@@ -127,7 +127,7 @@ export default function AddResourceModal({ open, onClose }: Props) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Add learning resource</h2>
-            <p className="text-xs text-gray-400 mt-0.5">AI will extract a summary, concepts, and quiz questions</p>
+            <p className="text-xs text-gray-400 mt-0.5">AI extracts chapters, concepts, formulas, flashcards, and a quiz</p>
           </div>
           <button onClick={handleClose} className="btn-ghost p-1.5">
             <X className="w-4 h-4" />
@@ -269,7 +269,7 @@ export default function AddResourceModal({ open, onClose }: Props) {
             </button>
             <button type="submit" className="btn-primary" disabled={!canSubmit || loading}>
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? 'Extracting… (up to 60s)' : 'Extract knowledge'}
+              {loading ? 'Extracting… (long videos can take a few minutes)' : 'Extract knowledge'}
             </button>
           </div>
         </form>
